@@ -285,7 +285,7 @@ Notes:
 
 ## Disclaimer
 
-This is an independent personal project. It is not affiliated with or endorsed by Universitas Widyatama or EdLink. It automates a browser session for an account you are authorized to use. Check your institution's terms of use before running it.
+This is an independent personal project.
 
 ## License
 
