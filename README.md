@@ -1,14 +1,45 @@
 # Hermes-Edlink
 
+![Version](https://img.shields.io/badge/version-v1.0.0-blue)
+![Status](https://img.shields.io/badge/status-active-brightgreen)
+![Validation](https://img.shields.io/badge/end--to--end%20validation-pending-orange)
+![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
+![Node.js](https://img.shields.io/badge/node-24%20(tested)-339933)
+![License](https://img.shields.io/badge/license-MIT-yellow)
+
 Hermes-Edlink is a local worker that watches EdLink for new lecture materials and records them in per-course JSON files. EdLink is the learning management system of Universitas Widyatama.
 
 This repository contains v1, which detects and indexes materials. It does not download attachments or read document contents. Later versions are described in the [roadmap](#roadmap).
+
+## Table of contents
+
+- [Status](#status)
+- [Roadmap](#roadmap)
+- [How v1 works](#how-v1-works)
+  - [Detection rules](#detection-rules)
+  - [Worker cycle](#worker-cycle)
+  - [Runtime topology](#runtime-topology)
+  - [Components](#components)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Runtime data](#runtime-data)
+- [Usage](#usage)
+- [Scheduling on Windows](#scheduling-on-windows)
+- [Known limitations](#known-limitations)
+- [Project structure](#project-structure)
+- [Development history](#development-history)
+- [Changelog](#changelog)
+- [Disclaimer](#disclaimer)
+- [License](#license)
 
 ## Status
 
 - Current version: v1 (local worker, indexing only).
 - The worker runs in apply mode, started every 15 minutes by Windows Task Scheduler.
 - End-to-end validation is pending. The worker has run on schedule, but no new material notification has appeared yet. The full path from notification to saved metadata and the processed-notification mark has not been observed on real data.
+
+The badges at the top are static. Update them when the version or status changes.
 
 ## Roadmap
 
@@ -18,7 +49,7 @@ This repository contains v1, which detects and indexes materials. It does not do
 | v2 | Integrate the Hermes agent with OpenRouter models. For each new material: read it, look up additional references, write a summary, produce a PDF and send it by email | Local machine | Planned |
 | v3 | Full agent that no longer depends on the local device | Not local | Planned |
 
-The scope of v2 and v3 is a working plan and can change. Each version is described in [CHANGELOG.md](CHANGELOG.md), and all versions live in this single repository.
+The scope of v2 and v3 is a working plan and can change. All versions live in this single repository, and releases are recorded in the [changelog](#changelog).
 
 Planned v2 flow:
 
@@ -192,17 +223,65 @@ Daily operation needs the computer to stay on and out of sleep or hibernation, a
 ├── scripts/       worker, browser manager, scanners and metadata updater
 ├── experiments/   historical inspection and test scripts
 ├── archive/       historical backups and one-time maintenance scripts
-├── docs/          project documentation
-├── CHANGELOG.md
 ├── LICENSE
 ├── package.json
 └── README.md
 ```
 
-## Documentation
+## Development history
 
-- [Development history](docs/DEVELOPMENT-HISTORY.md)
-- [Changelog](CHANGELOG.md)
+v1 was built and activated on 2 and 3 November 2026 with a focus on local execution and validation. Integration with Hermes and OpenRouter is planned for v2.
+
+Scope: monitor lecture materials across seven classes, use notifications as the main signal and class scans for verification, store metadata in the existing per-course structure, prevent duplicates, and run every 15 minutes. Assignments, quizzes, exams, attendance, grades, discussions, attachment downloads, document processing and email delivery are out of scope for v1.
+
+Baseline dataset after the first scan and apply:
+
+| Item | Count |
+|---|---|
+| Classes | 7 |
+| Materials | 39 |
+| Attachments | 51 |
+| Missing attachment metadata after audit | 0 |
+
+<details>
+<summary>Work log</summary>
+
+1. Environment: Windows, PowerShell 7, Node.js 24, npm, Python 3.12, Playwright and Google Chrome 156. The project uses CommonJS.
+2. Browser: a dedicated Chrome profile keeps the worker session separate from the main profile. Playwright connects through the DevTools protocol on port 9223. The dashboard was inspected to learn the structure of the class pages.
+3. Profile backup: the dedicated profile was copied and the copy is used for headless operation. The copy matched the source in file count and size, headless Chrome opened EdLink with a valid session, and there was no redirect to the login page. The original profile is not used for headless runs.
+4. Class list: seven Academic classes were configured.
+5. Baseline scan: `scan-all-classes.js` opened each class, filtered activities by the `menambahkan materi pada` label, and read titles, session information, attachment names and download availability without downloading anything.
+6. Metadata: the existing per-course structure was kept. `update-course-materials.js` matches scan results to existing records by stable ID, preserves attachment metadata and backs up before any change. It has a dry-run mode and an apply mode. The earlier migration was completed and is not repeated. The worker no longer updates the legacy registry.
+7. Audit: after the first apply, every course file was checked. No attachment metadata was missing, and existing content indexes and hashes were kept.
+8. Notification scanner: `scan-material-notifications.js` connects over CDP, checks for a login page and reads notifications matching `Ada Materi baru @...`. It does not click or delete notifications.
+9. Browser manager: `browser-manager.js` starts headless Chrome with the operational profile if it is not running and checks the CDP connection. Chrome runs as a background process, not as a Windows service.
+10. Worker: `worker.js` combines the steps with a lock file, a state file, a log and the dry-run and apply modes. Notifications are marked as processed only after the apply-mode updater succeeds.
+11. Dry-run testing: several dry runs finished without errors. With no new notifications, the class scan was skipped as designed.
+12. Scheduling: a Task Scheduler task runs the worker every 15 minutes. It first ran in dry-run mode and returned result code 0.
+13. Apply mode: after repeated successful dry runs the task was switched to apply mode and started manually. It returned result code 0, and the log showed no material notifications and no class scan.
+
+</details>
+
+## Changelog
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version 1.x corresponds to v1, 2.x to v2 and 3.x to v3.
+
+### [1.0.0] - 2026-11-03
+
+First public release of the v1 local worker.
+
+Added:
+
+- Worker that runs a full cycle with a lock file, a state file and a log, in dry-run or apply mode.
+- Notification scanner for EdLink notifications matching `Ada Materi baru @...`.
+- Class scanner for material activities labeled `menambahkan materi pada`, without downloading attachments.
+- Course updater that matches scan results to existing records by stable ID, backs up before writing and stores per-course metadata.
+- Browser manager that starts headless Chrome with a dedicated profile over the DevTools protocol.
+- Runtime configuration through environment variables.
+
+Notes:
+
+- End-to-end validation on a real new-material notification is pending.
 
 ## Disclaimer
 
