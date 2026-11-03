@@ -70,7 +70,6 @@ Do not run either mode against an active production environment without first re
 - `experiments/` — historical inspection and testing scripts.
 - `archive/` — historical backups and maintenance scripts.
 - `docs/` — project documentation.
-- `examples/` — example files.
 
 ## Development History
 
