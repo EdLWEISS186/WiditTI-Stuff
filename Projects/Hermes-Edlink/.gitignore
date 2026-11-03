@@ -1,0 +1,14 @@
+node_modules/
+browser/
+temp/
+**/edlink-profile/
+data/
+logs/
+output/
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

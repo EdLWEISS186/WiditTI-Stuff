@@ -1,0 +1,164 @@
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+
+const ROOT = path.resolve(__dirname, "..");
+const SCAN_PATH = path.join(ROOT, "data", "materials-scan.json");
+const CLASSES_PATH = path.join(ROOT, "data", "classes.json");
+const COURSES_DIR = path.join(ROOT, "data", "courses");
+
+function normalize(value) {
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase();
+}
+
+function hash(value) {
+    return crypto
+        .createHash("sha256")
+        .update(value)
+        .digest("hex");
+}
+
+function createMaterialId(classId, material) {
+    return hash([
+        classId,
+        material.sessionUrl || "",
+        normalize(material.title)
+    ].join("|"));
+}
+
+function createAttachmentId(materialId, filename, occurrence) {
+    return hash([
+        materialId,
+        normalize(filename),
+        occurrence
+    ].join("|"));
+}
+
+function readJson(filePath) {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function main() {
+    if (!fs.existsSync(SCAN_PATH)) {
+        throw new Error("materials-scan.json tidak ditemukan.");
+    }
+
+    const scan = readJson(SCAN_PATH);
+    const classesData = readJson(CLASSES_PATH);
+    const classes = classesData.classes;
+
+    if (
+        scan.failedClasses !== 0 ||
+        scan.successfulClasses !== scan.totalClasses ||
+        scan.totalClasses !== classes.length
+    ) {
+        throw new Error("Scan tidak lengkap atau jumlah kelas tidak cocok. Dry-run dibatalkan.");
+    }
+
+    const report = {
+        mode: "DRY-RUN — READ ONLY",
+        scannedClasses: scan.totalClasses,
+        scannedMaterials: 0,
+        scannedAttachments: 0,
+        matchedMaterials: 0,
+        newMaterials: [],
+        ambiguousMaterials: [],
+        missingCourseFiles: [],
+        attachmentMismatches: []
+    };
+
+    for (const classData of scan.classes) {
+        const classInfo = classes.find(
+            item => String(item.id) === String(classData.classId)
+        );
+
+        if (!classInfo) {
+            report.missingCourseFiles.push({
+                classId: classData.classId,
+                reason: "Kelas tidak ditemukan di classes.json"
+            });
+            continue;
+        }
+
+        const slug = classInfo.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+
+        const courseDir = path.join(
+            COURSES_DIR,
+            `${classInfo.id}-${slug}`
+        );
+
+        const materialsPath = path.join(courseDir, "materials.json");
+
+        if (!fs.existsSync(materialsPath)) {
+            report.missingCourseFiles.push({
+                classId: classData.classId,
+                reason: "materials.json tidak ditemukan"
+            });
+            continue;
+        }
+
+        const courseData = readJson(materialsPath);
+        const existingMaterials = courseData.materials || {};
+
+        for (const material of classData.materials || []) {
+            report.scannedMaterials++;
+
+            const materialId = createMaterialId(
+                classData.classId,
+                material
+            );
+
+            const existing = existingMaterials[materialId];
+
+            if (!existing) {
+                report.newMaterials.push({
+                    className: classData.className,
+                    title: material.title,
+                    sessionUrl: material.sessionUrl,
+                    attachmentCount: (material.files || []).length
+                });
+                report.scannedAttachments += (material.files || []).length;
+                continue;
+            }
+
+            report.matchedMaterials++;
+
+            const existingAttachmentIds = new Set(existing.attachments || []);
+            const occurrences = {};
+
+            for (const file of material.files || []) {
+                report.scannedAttachments++;
+
+                const filename = normalize(file.filename);
+                occurrences[filename] = (occurrences[filename] || 0) + 1;
+
+                const attachmentId = createAttachmentId(
+                    materialId,
+                    file.filename,
+                    occurrences[filename]
+                );
+
+                if (!existingAttachmentIds.has(attachmentId)) {
+                    report.attachmentMismatches.push({
+                        className: classData.className,
+                        materialTitle: material.title,
+                        filename: file.filename,
+                        reason: "ID lampiran hasil scan tidak ditemukan di data course"
+                    });
+                }
+            }
+        }
+    }
+
+    console.log("\n=== COURSE MATERIAL UPDATE — DRY RUN ===\n");
+    console.log(JSON.stringify(report, null, 2));
+    console.log("\nTidak ada file yang diubah.");
+}
+
+main();
