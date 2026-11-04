@@ -1,5 +1,5 @@
 const { chromium } = require("playwright");
-const { CDP_URL } = require("./runtime-config");
+const { CDP_URL, NOTIFICATION_PATTERN } = require("./runtime-config");
 const fs = require("fs");
 const path = require("path");
 
@@ -60,14 +60,18 @@ const path = require("path");
           materialTitle: title?.innerText.trim() || "",
           relativeTime: time?.innerText.trim() || ""
         };
-      }).filter(item =>
-        /^Ada Materi baru\s*@/i.test(item.heading)
-      ).map(item => ({
-        ...item,
-        className: item.heading
-          .replace(/^Ada Materi baru\s*@/i, "")
-          .trim()
-      }));
+      }).filter(item => {
+        const pattern = new RegExp(`^${NOTIFICATION_PATTERN}`, "i");
+        return pattern.test(item.heading);
+      }).map(item => {
+        const pattern = new RegExp(`^${NOTIFICATION_PATTERN}`, "i");
+        return {
+          ...item,
+          className: item.heading
+            .replace(pattern, "")
+            .trim()
+        };
+      });
     });
 
     const output = {

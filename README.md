@@ -67,8 +67,8 @@ flowchart LR
 
 ### Detection rules
 
-- EdLink notifications matching the pattern `Ada Materi baru @...` are the trigger. They only decide whether to look further.
-- The class scanner decides what counts as a material. Only activities labeled `menambahkan materi pada` are included.
+- EdLink notifications matching the configured pattern (default: `Ada Materi baru @...`) are the trigger. They only decide whether to look further.
+- The class scanner decides what counts as a material. Only activities labeled with the configured activity label (default: `menambahkan materi pada`) are included.
 - A class scan runs only after a trigger. It verifies the result and is not an independent periodic check. When no new notification appears, the worker finishes without scanning any class.
 - Assignments, quizzes, exams, attendance, grades, discussions and other LMS activities are excluded.
 - Attachments are not downloaded during normal operation. Only their names and download availability are recorded.
@@ -151,6 +151,8 @@ Settings are read from environment variables.
 | `CDP_HOST` | Chrome DevTools host | `127.0.0.1` |
 | `CDP_PORT` | Chrome DevTools port | `9223` |
 | `EDLINK_BASE_URL` | EdLink base URL | `https://lms.widyatama.ac.id` |
+| `NOTIFICATION_PATTERN` | Regex pattern for material notifications | `Ada Materi baru\\s*@` |
+| `MATERIAL_ACTIVITY_LABEL` | Text label for material activities | `menambahkan materi pada` |
 
 ## Runtime data
 
@@ -211,7 +213,7 @@ Daily operation needs the computer to stay on and out of sleep or hibernation, a
 
 - The worker expects exactly seven classes in `data/classes.json` and stops otherwise. A different number of classes requires editing `scripts/worker.js`.
 - The updater only updates course folders that already exist. Creating the initial data for a new class or semester is not part of the worker.
-- Notification identity includes the relative time text that EdLink shows. If that text changes between runs, an already handled notification can look new and trigger another class scan. ID matching still prevents duplicate metadata. This is under review.
+- Notification identity is based on class name and material title only. This ensures stability across multiple runs regardless of UI text formatting changes.
 - Failures, including an expired EdLink session, are written to `logs/worker.log` only. No alert is sent.
 - The worker runs on one machine and does not run while that machine sleeps or is off.
 - End-to-end validation on a real new-material notification is still pending.
@@ -250,10 +252,10 @@ Baseline dataset after the first scan and apply:
 2. Browser: a dedicated Chrome profile keeps the worker session separate from the main profile. Playwright connects through the DevTools protocol on port 9223. The dashboard was inspected to learn the structure of the class pages.
 3. Profile backup: the dedicated profile was copied and the copy is used for headless operation. The copy matched the source in file count and size, headless Chrome opened EdLink with a valid session, and there was no redirect to the login page. The original profile is not used for headless runs.
 4. Class list: seven Academic classes were configured.
-5. Baseline scan: `scan-all-classes.js` opened each class, filtered activities by the `menambahkan materi pada` label, and read titles, session information, attachment names and download availability without downloading anything.
+5. Baseline scan: `scan-all-classes.js` opened each class, filtered activities by the configured material activity label, and read titles, session information, attachment names and download availability without downloading anything.
 6. Metadata: the existing per-course structure was kept. `update-course-materials.js` matches scan results to existing records by stable ID, preserves attachment metadata and backs up before any change. It has a dry-run mode and an apply mode. The earlier migration was completed and is not repeated. The worker no longer updates the legacy registry.
 7. Audit: after the first apply, every course file was checked. No attachment metadata was missing, and existing content indexes and hashes were kept.
-8. Notification scanner: `scan-material-notifications.js` connects over CDP, checks for a login page and reads notifications matching `Ada Materi baru @...`. It does not click or delete notifications.
+8. Notification scanner: `scan-material-notifications.js` connects over CDP, checks for a login page and reads notifications matching the configured pattern. It does not click or delete notifications.
 9. Browser manager: `browser-manager.js` starts headless Chrome with the operational profile if it is not running and checks the CDP connection. Chrome runs as a background process, not as a Windows service.
 10. Worker: `worker.js` combines the steps with a lock file, a state file, a log and the dry-run and apply modes. Notifications are marked as processed only after the apply-mode updater succeeds.
 11. Dry-run testing: several dry runs finished without errors. With no new notifications, the class scan was skipped as designed.
@@ -273,8 +275,8 @@ First public release of the v1 local worker.
 Added:
 
 - Worker that runs a full cycle with a lock file, a state file and a log, in dry-run or apply mode.
-- Notification scanner for EdLink notifications matching `Ada Materi baru @...`.
-- Class scanner for material activities labeled `menambahkan materi pada`, without downloading attachments.
+- Notification scanner for EdLink notifications matching the configured pattern.
+- Class scanner for material activities labeled with the configured activity label, without downloading attachments.
 - Course updater that matches scan results to existing records by stable ID, backs up before writing and stores per-course metadata.
 - Browser manager that starts headless Chrome with a dedicated profile over the DevTools protocol.
 - Runtime configuration through environment variables.

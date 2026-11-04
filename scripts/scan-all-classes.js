@@ -7,7 +7,7 @@ const ROOT = path.resolve(__dirname, "..");
 const CONFIG_PATH = path.join(ROOT, "data", "classes.json");
 const OUTPUT_PATH = path.join(ROOT, "data", "materials-scan.json");
 const REPORT_DIR = path.join(ROOT, "output", "reports");
-const { CDP_URL } = require("./runtime-config");
+const { CDP_URL, MATERIAL_ACTIVITY_LABEL } = require("./runtime-config");
 
 function saveJson(filePath, data) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -43,7 +43,7 @@ async function scanClass(page, classInfo) {
 
             // Filter berdasarkan LABEL AKTIVITAS EDLink.
             // Nama file tidak digunakan untuk klasifikasi.
-            if (!/menambahkan materi pada/i.test(headerText)) {
+            if (!new RegExp(MATERIAL_ACTIVITY_LABEL, "i").test(headerText)) {
                 continue;
             }
 

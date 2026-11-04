@@ -26,6 +26,12 @@ const CDP_VERSION_URL = `${CDP_URL}/json/version`;
 const EDLINK_BASE_URL =
     process.env.EDLINK_BASE_URL || "https://lms.widyatama.ac.id";
 
+const NOTIFICATION_PATTERN =
+    process.env.NOTIFICATION_PATTERN || "Ada Materi baru\\s*@";
+
+const MATERIAL_ACTIVITY_LABEL =
+    process.env.MATERIAL_ACTIVITY_LABEL || "menambahkan materi pada";
+
 module.exports = {
     ROOT,
     CHROME_PATH,
@@ -34,5 +40,7 @@ module.exports = {
     CDP_PORT,
     CDP_URL,
     CDP_VERSION_URL,
-    EDLINK_BASE_URL
+    EDLINK_BASE_URL,
+    NOTIFICATION_PATTERN,
+    MATERIAL_ACTIVITY_LABEL
 };

@@ -45,10 +45,12 @@ function normalize(value) {
 }
 
 function notificationKey(item) {
+    // Identity uses className + materialTitle only (stable).
+    // relativeTime is excluded because EdLink UI text changes hourly,
+    // causing already-processed notifications to appear new.
     const identity = [
         normalize(item.className),
-        normalize(item.materialTitle),
-        normalize(item.relativeTime)
+        normalize(item.materialTitle)
     ].join("|");
 
     return crypto
